@@ -6,9 +6,32 @@ theme_set(theme_classic(base_size = 12.5))
 load(here("validation", "Andersson2017_raw.Rdata"))
 load(here("validation", "Andersson2017_fitted.Rdata"))
 
+# simulate
+mod <- A2017.fit[[3]][[3]][[4]]$model
+sim <- simulate(A2017.fit[[3]][[3]][[4]]$model)
+sts <- as.vector(mod@posterior[,1])
+mat <- array(NA, dim = c(4, 3, length(sts)))
+
+for(state in 1:4) {
+  for(resp in 1:3) {
+    mat[state, resp, ] <- as.vector(simulate(sim@response[[state]][[resp]]))
+  }
+}
+
+pred <- matrix(NA, nrow = length(sts), ncol = 3)
+for(i in seq_along(sts)) {
+  pred[i,] <- mat[sts[i],,i,drop=TRUE]
+}
+pred[,1] <- pred[,1]*100
+pred[,2] <- pred[,2]*10000
+
+# plot
 merged <- bind_cols(A2017.fit[[3]][[3]][[4]]$samples, 
                 coderMN = A2017[[3]][[3]]$coderMN,
-                coderRA = A2017[[3]][[3]]$coderRA)
+                coderRA = A2017[[3]][[3]]$coderRA,
+                predVel = pred[,1],
+                predAcc = pred[,2],
+                predAng = pred[,3])
 
 rm(A2017, A2017.fit)
 
@@ -85,3 +108,18 @@ for(feat in features) {
 
 wrap_plots(data_plots, ncol = 1)
 ggsave(path = "manuscript", filename = "scarf.png", width = 4.5, height = 8)
+
+
+
+velRange <- range(c(df$predVel))
+accRange <- range(c(df$predAcc))
+angRange <- c(0, 2*pi)
+colors <- ifelse(df$gazeHMM == "Fixation", "blue", ifelse(df$gazeHMM == "Saccade", "red", ifelse(df$gazeHMM == "PSO", "green", "darkgreen")))
+par(mfcol = c(3, 1), cex = 1)
+plot(df$predVel, type = "l", ylim = velRange, ylab = "Velocity",    xlab = "", bty = "l")
+legend(x = 75, y = 500, legend = c("Fixation", "Saccade", "PSO", "Smooth Pursuit"), fill = c("blue", "red", "green", "darkgreen"), cex = 0.7)
+points(df$predVel, pch = 21, bg = colors)
+plot(df$predAcc, type = "l", ylim = accRange, ylab = "Acceleration", xlab = "", bty = "l")
+points(df$predAcc, pch = 21, bg = colors)
+plot(df$predAng, type = "l", ylim = angRange, ylab = "Angle",        xlab = "Time (sample index)", bty = "l")
+points(df$predAng, pch = 21, bg = colors)
